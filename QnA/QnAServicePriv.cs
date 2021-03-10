@@ -13,12 +13,12 @@ namespace AAI
         //
         // Data members
         //
-        private IConfiguration config;                // Values found in appsettings.json
-        private QnAMakerClient azureEndpoint;         // Access to qna service endpoint in azure (see azure portal)
-        private QnAMakerRuntimeClient qnaEndpoint;    // Access to qna maker service endpoint (see www.qnamaker.ai)
-        private string knowledgeBaseID;               // Current knowledge base being accessed
-        private string queryEndpointKey;              // Authorization key used to access qna maker service
-        //
+        public string AuthoringKey { get; set; }
+        public string ResourceName { get; set; }
+        public string ApplicationName { get; set; }
+        public string KnowledgeBaseID { get; set; }
+        public string QueryEndpointKey { get; set; }
+
         // Provided methods
         //
         /// <summary>
@@ -27,36 +27,18 @@ namespace AAI
         /// </summary>
         public QnAService()
         {
-            config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false, reloadOnChange: true).Build();
-            queryEndpointKey = config["QueryEndpointKey"];
-            if (queryEndpointKey != null && queryEndpointKey.Length == 0)
-            {
-                queryEndpointKey = null;
-            }
-            knowledgeBaseID = config["KnowledgeBaseID"];
-            if (knowledgeBaseID != null && knowledgeBaseID.Length == 0)
-            {
-                knowledgeBaseID = null;
-            }
+
         }
-        /// <summary>
-        /// Knowledge base id returned when the QnA knowledge base is created. Identifies knowledge base for operations defined in QnAService.
-        /// </summary>
-        /// <summary>
-        /// 
-        /// </summary>
-        public string KnowledgeBaseID
+
+        public QnAService(string authoringKey, string resourceName, string applicationName, string knowledgeBaseID, string queryEndpointKey)
         {
-            get
-            {
-                return knowledgeBaseID;
-            }
-            set
-            {
-                knowledgeBaseID = value;
-                queryEndpointKey = null;
-            }
+            AuthoringKey = authoringKey;
+            ResourceName = resourceName;
+            ApplicationName = applicationName;
+            KnowledgeBaseID = knowledgeBaseID;
+            QueryEndpointKey = queryEndpointKey;
         }
+
         /// <summary>
         /// Download knowledge base creating dictionary where the lookup is the answer. There can be multiple questions per answer.
         /// </summary>
@@ -64,7 +46,7 @@ namespace AAI
         /// <returns>dictionary of entire knowledge base</returns>
         public async Task<Dictionary<string, QnADTO>> GetExistingAnswers(bool published)
         {
-            QnADocumentsDTO kb = await AzureEndpoint().Knowledgebase.DownloadAsync(knowledgeBaseID, published ? EnvironmentType.Prod : EnvironmentType.Test);
+            QnADocumentsDTO kb = await AzureEndpoint().Knowledgebase.DownloadAsync(KnowledgeBaseID, published ? EnvironmentType.Prod : EnvironmentType.Test);
             Dictionary<string, QnADTO> existing = new Dictionary<string, QnADTO>();
             foreach (QnADTO entry in kb.QnaDocuments)
             {
@@ -73,7 +55,7 @@ namespace AAI
             return existing;
         }
         /// <summary>
-        /// QnA endpoint is used to query and train knowledge base. 
+        /// QnA endpoint is used to query and train knowledge base.
         /// </summary>
         /// <returns>QnA endpoint object</returns>
         public async Task<QnAMakerRuntimeClient> QnAEndpoint()
@@ -82,7 +64,7 @@ namespace AAI
         }
         /// <summary>
         /// Azure endpoint is used to create, publish, download, update, and delete QnA knowledge bases. Creates
-        /// one using configured data. 
+        /// one using configured data.
         /// </summary>
         /// <returns>azure endpoint object</returns>
         public QnAMakerClient AzureEndpoint()
@@ -95,10 +77,15 @@ namespace AAI
         /// <returns>QnA Auth Key</returns>
         public async Task<string> QueryKey()
         {
-            return queryEndpointKey ?? await RetrieveEndpointKey();
+            await RetrieveEndpointKey();
+            return QueryEndpointKey;
         }
         //======================================
         // Methods to be used only by QnAService
+        // Methods to be used only by QnAService
+        private QnAMakerClient azureEndpoint;         // Access to qna service endpoint in azure (see azure portal)
+        private QnAMakerRuntimeClient qnaEndpoint;    // Access to qna maker service endpoint (see www.qnamaker.ai)
+
         /// <summary>
         /// Make alterations to the knowledge base, polls until the knowledge base has been updated.
         /// </summary>
@@ -114,7 +101,7 @@ namespace AAI
                 Update = updates != null && updates.Count > 0 ? new UpdateKbOperationDTOUpdate { QnaList = updates } : null,
                 Delete = deletes != null && deletes.Count > 0 ? new UpdateKbOperationDTODelete { Ids = deletes } : null
             };
-            var op = await AzureEndpoint().Knowledgebase.UpdateAsync(knowledgeBaseID, update);
+            var op = await AzureEndpoint().Knowledgebase.UpdateAsync(KnowledgeBaseID, update);
             op = await MonitorOperation(op);
             return (op.OperationState, op.ErrorResponse == null ? null : op.ErrorResponse.ToString());
         }
@@ -146,24 +133,23 @@ namespace AAI
         // Helper methods targeted for QnAServicePriv only, not docuemented.
         private QnAMakerClient CreateConfiguredAzureEndpoint()
         {
-            ApiKeyServiceClientCredentials credentials = new ApiKeyServiceClientCredentials(config["AuthoringKey"]);
+            ApiKeyServiceClientCredentials credentials = new ApiKeyServiceClientCredentials(AuthoringKey);
             azureEndpoint = new QnAMakerClient(credentials);
-            azureEndpoint.Endpoint = $"https://{config["ResourceName"]}.cognitiveservices.azure.com";
+            azureEndpoint.Endpoint = $"https://{ResourceName}.cognitiveservices.azure.com";
             return azureEndpoint;
         }
         private async Task<QnAMakerRuntimeClient> CreateQnAEndpoint()
         {
             var endpointKey = await QueryKey();
             var credentials = new EndpointKeyServiceClientCredentials(endpointKey);
-            string queryEndpoint = $"https://{config["ApplicationName"]}.azurewebsites.net";
+            string queryEndpoint = $"https://{ApplicationName}.azurewebsites.net";
             qnaEndpoint = new QnAMakerRuntimeClient(credentials) { RuntimeEndpoint = queryEndpoint };
             return qnaEndpoint;
         }
-        private async Task<string> RetrieveEndpointKey()
+        private async Task RetrieveEndpointKey()
         {
             var endpointKeysObject = await AzureEndpoint().EndpointKeys.GetKeysAsync();
-            queryEndpointKey = endpointKeysObject.PrimaryEndpointKey;
-            return queryEndpointKey;
+            QueryEndpointKey = endpointKeysObject.PrimaryEndpointKey;
         }
     }
 }

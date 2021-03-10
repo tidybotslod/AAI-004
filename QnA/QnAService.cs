@@ -52,7 +52,7 @@ namespace AAI
         {
             QnAMakerRuntimeClient client = await QnAEndpoint();
             QueryDTO query = new QueryDTO { Question = question, Top = topQuestions, IsTest = !published };
-            QnASearchResultList response =  await client.Runtime.GenerateAnswerAsync(knowledgeBaseID, query);
+            QnASearchResultList response =  await client.Runtime.GenerateAnswerAsync(KnowledgeBaseID, query);
 
             return response;
         }
@@ -74,8 +74,8 @@ namespace AAI
             string result = op.ResourceLocation;
             if (op.OperationState == OperationStateType.Succeeded)
             {
-                knowledgeBaseID = op.ResourceLocation.Replace("/knowledgebases/", string.Empty);
-                return (op.OperationState, knowledgeBaseID);
+                KnowledgeBaseID = op.ResourceLocation.Replace("/knowledgebases/", string.Empty);
+                return (op.OperationState, KnowledgeBaseID);
             }
             else
             {
@@ -84,7 +84,7 @@ namespace AAI
         }
         public async Task DeleteKnowledgeBase()
         {
-            await AzureEndpoint().Knowledgebase.DeleteAsync(knowledgeBaseID);
+            await AzureEndpoint().Knowledgebase.DeleteAsync(KnowledgeBaseID);
         }
 
 
@@ -94,7 +94,7 @@ namespace AAI
         /// <returns></returns>
         public async Task Publish()
         {
-            await AzureEndpoint().Knowledgebase.PublishAsync(knowledgeBaseID);
+            await AzureEndpoint().Knowledgebase.PublishAsync(KnowledgeBaseID);
         }
 
         /// <summary>

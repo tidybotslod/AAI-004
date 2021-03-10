@@ -15,6 +15,7 @@
 #endif
 
 using System;
+using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Azure.CognitiveServices.Knowledge.QnAMaker.Models;
@@ -29,7 +30,16 @@ namespace AAI
         [AssemblyInitialize]
         public static void AssemblyInit(TestContext context)
         {
-            service = new QnAService();
+            IConfiguration config; // Load configuration data found in appsettings.json, need Azure authoring key and resource name to build URL to azure.
+            config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false, reloadOnChange: true).Build();
+            service = new QnAService
+            {
+                AuthoringKey = ConfigurationValue(config, "AuthoringKey"),
+                ResourceName = ConfigurationValue(config, "ResourceName"),
+                ApplicationName = ConfigurationValue(config, "ApplicationName"),
+                KnowledgeBaseID = ConfigurationValue(config, "KnowledgeBaseID"),
+                QueryEndpointKey = ConfigurationValue(config, "QueryEndpointKey")
+            };
         }
 #if (CreateEnabled)
         //
@@ -109,7 +119,7 @@ namespace AAI
 #endif
 #if (UpdateEnabled && AskEnabled)
         //
-        // Update the existing two quesions to remove temporary text. 
+        // Update the existing two quesions to remove temporary text.
         private async Task<bool> UpdateQuestions(bool production)
         {
             var (status, error) = await service.UpdateQnA(QnAFile.LoadCSV("..\\..\\..\\..\\Data\\update-faq.csv"));
@@ -171,7 +181,7 @@ namespace AAI
             try
             {
                 Task.Run(async () => { Assert.IsTrue(await CreateDatabase()); }).Wait();
-            }   
+            }
             finally
             {
                 if (service.KnowledgeBaseID != null && service.KnowledgeBaseID.Length > 0)
@@ -179,7 +189,7 @@ namespace AAI
                     Task.Run(async () => { Assert.IsTrue(await CleanUp()); }).Wait();
                 }
             }
-        }     
+        }
 #endif
 #if (TestAsk)
         [TestMethod()]
@@ -210,7 +220,7 @@ namespace AAI
                 Task.Run(async () => { Assert.IsTrue(await CreateDatabase()); }).Wait();
                 Task.Run(async () => { Assert.IsTrue(await AskQuestion(production)); }).Wait();
                 Task.Run(async () => { Assert.IsTrue(await AddQuestion(production)); }).Wait();
-            }   
+            }
             finally
             {
                 if (service.KnowledgeBaseID != null && service.KnowledgeBaseID.Length > 0)
@@ -218,7 +228,7 @@ namespace AAI
                     Task.Run(async () => { Assert.IsTrue(await CleanUp()); }).Wait();
                 }
             }
-        }     
+        }
 #endif
 #if (TestUpdate)
         [TestMethod()]
@@ -231,7 +241,7 @@ namespace AAI
                 Task.Run(async () => { Assert.IsTrue(await AskQuestion(production)); }).Wait();
                 Task.Run(async () => { Assert.IsTrue(await AddQuestion(production)); }).Wait();
                 Task.Run(async () => { Assert.IsTrue(await UpdateQuestions(production)); }).Wait();
-            }   
+            }
             finally
             {
                 if (service.KnowledgeBaseID != null && service.KnowledgeBaseID.Length > 0)
@@ -239,7 +249,7 @@ namespace AAI
                     Task.Run(async () => { Assert.IsTrue(await CleanUp()); }).Wait();
                 }
             }
-        }     
+        }
 #endif
 #if (TestCrud)
         [TestMethod()]
@@ -254,7 +264,7 @@ namespace AAI
                 Task.Run(async () => { Assert.IsTrue(await AddQuestion(production)); }).Wait();
                 Task.Run(async () => { Assert.IsTrue(await UpdateQuestions(production)); }).Wait();
                 Task.Run(async () => { Assert.IsTrue(await AddFullText(production)); }).Wait();
-            }   
+            }
             finally
             {
                 if (service.KnowledgeBaseID != null && service.KnowledgeBaseID.Length > 0)
@@ -266,5 +276,14 @@ namespace AAI
 
 #endif
 
+        private static string ConfigurationValue(IConfiguration config, string name)
+        {
+            string value = config[name];
+            if (value != null && value.Length == 0)
+            {
+                value = null;
+            }
+            return value;
+        }
     }
 }
